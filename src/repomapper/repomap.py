@@ -11,15 +11,12 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import List
 
-from utils import count_tokens, read_text, Tag
-from scm import get_scm_fname
-from importance import is_important, filter_important_files
-from repomap_class import RepoMap
+from .repomap_class import RepoMap
+from .utils import count_tokens, read_text
 
 
-def find_src_files(directory: str) -> List[str]:
+def find_src_files(directory: str) -> list[str]:
     """Find source files in a directory."""
     if not os.path.isdir(directory):
         return [directory] if os.path.isfile(directory) else []
@@ -197,22 +194,26 @@ Examples:
     
     # Generate the map
     try:
-        map_content = repo_map.get_repo_map(
+        map_content, file_report = repo_map.get_repo_map(
             chat_files=chat_files,
             other_files=other_files,
             mentioned_fnames=mentioned_fnames,
             mentioned_idents=mentioned_idents,
             force_refresh=args.force_refresh
         )
-        
+
         if map_content:
             if args.verbose:
                 tokens = repo_map.token_count(map_content)
                 tool_output(f"Generated map: {len(map_content)} chars, ~{tokens} tokens")
-            
+
             print(map_content)
         else:
             tool_output("No repository map generated.")
+            if args.verbose:
+                tool_output(f"File report: {file_report.total_files_considered} files considered, "
+                           f"{file_report.definition_matches} definitions, "
+                           f"{file_report.reference_matches} references")
             
     except KeyboardInterrupt:
         tool_error("Interrupted by user")

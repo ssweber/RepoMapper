@@ -1,19 +1,17 @@
 import asyncio
-import json
-import os
 import logging
+import os
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Set
-import dataclasses
+from typing import Any
 
 from fastmcp import FastMCP, settings
-from repomap_class import RepoMap
-from utils import count_tokens, read_text
-from scm import get_scm_fname
-from importance import filter_important_files
+
+from .repomap_class import RepoMap
+from .utils import count_tokens, read_text
+
 
 # Helper function from your CLI, useful to have here
-def find_src_files(directory: str) -> List[str]:
+def find_src_files(directory: str) -> list[str]:
     if not os.path.isdir(directory):
         return [directory] if os.path.isfile(directory) else []
     src_files = []
@@ -53,16 +51,16 @@ mcp = FastMCP("RepoMapServer")
 @mcp.tool()
 async def repo_map(
     project_root: str,
-    chat_files: Optional[List[str]] = None,
-    other_files: Optional[List[str]] = None,
+    chat_files: list[str] | None = None,
+    other_files: list[str] | None = None,
     token_limit: Any = 8192,  # Accept any type to handle empty strings
     exclude_unranked: bool = False,
     force_refresh: bool = False,
-    mentioned_files: Optional[List[str]] = None,
-    mentioned_idents: Optional[List[str]] = None,
+    mentioned_files: list[str] | None = None,
+    mentioned_idents: list[str] | None = None,
     verbose: bool = False,
-    max_context_window: Optional[int] = None,
-) -> Dict[str, Any]:
+    max_context_window: int | None = None,
+) -> dict[str, Any]:
     """Generate a repository map for the specified files, providing a list of function prototypes and variables for files as well as relevant related
     files. Provide filenames relative to the project_root. In addition to the files provided, relevant related files will also be included with a
     very small ranking boost.
@@ -182,7 +180,7 @@ async def search_identifiers(
     context_lines: int = 2,
     include_definitions: bool = True,
     include_references: bool = True
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Search for identifiers in code files. Get back a list of matching identifiers with their file, line number, and context.
        When searching, just use the identifier name without any special characters, prefixes or suffixes. The search is 
        case-insensitive.

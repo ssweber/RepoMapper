@@ -3,25 +3,25 @@ RepoMap class for generating repository maps.
 """
 
 import os
-import sys
-from pathlib import Path
-from collections import namedtuple, defaultdict
-from typing import List, Dict, Set, Optional, Tuple, Callable, Any, Union
 import shutil
 import sqlite3
-from utils import Tag
+import sys
+from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
+
 import diskcache
 import networkx as nx
 from grep_ast import TreeContext
-from utils import count_tokens, read_text, Tag
-from scm import get_scm_fname
-from importance import filter_important_files
+
+from .scm import get_scm_fname
+from .utils import Tag, count_tokens, read_text
 
 
 @dataclass
 class FileReport:
-    excluded: Dict[str, str]        # File -> exclusion reason with status
+    excluded: dict[str, str]        # File -> exclusion reason with status
     definition_matches: int         # Total definition tags
     reference_matches: int          # Total reference tags
     total_files_considered: int     # Total files provided as input
@@ -34,9 +34,6 @@ CACHE_VERSION = 1
 TAGS_CACHE_DIR = os.path.join(os.getcwd(), f".repomap.tags.cache.v{CACHE_VERSION}")
 SQLITE_ERRORS = (sqlite3.OperationalError, sqlite3.DatabaseError)
 
-# Tag namedtuple for storing parsed code definitions and references
-Tag = namedtuple("Tag", "rel_fname fname line name kind".split())
-
 
 class RepoMap:
     """Main class for generating repository maps."""
@@ -46,11 +43,11 @@ class RepoMap:
         map_tokens: int = 1024,
         root: str = None,
         token_counter_func: Callable[[str], int] = count_tokens,
-        file_reader_func: Callable[[str], Optional[str]] = read_text,
-        output_handler_funcs: Dict[str, Callable] = None,
-        repo_content_prefix: Optional[str] = None,
+        file_reader_func: Callable[[str], str | None] = read_text,
+        output_handler_funcs: dict[str, Callable] = None,
+        repo_content_prefix: str | None = None,
         verbose: bool = False,
-        max_context_window: Optional[int] = None,
+        max_context_window: int | None = None,
         map_mul_no_files: int = 8,
         refresh: str = "auto",
         exclude_unranked: bool = False
@@ -144,7 +141,7 @@ class RepoMap:
         except ValueError:
             return fname
     
-    def get_mtime(self, fname: str) -> Optional[float]:
+    def get_mtime(self, fname: str) -> float | None:
         """Get file modification time."""
         try:
             return os.path.getmtime(fname)
@@ -152,7 +149,7 @@ class RepoMap:
             self.output_handlers['warning'](f"File not found: {fname}")
             return None
     
-    def get_tags(self, fname: str, rel_fname: str) -> List[Tag]:
+    def get_tags(self, fname: str, rel_fname: str) -> list[Tag]:
         """Get tags for a file, using cache when possible."""
         file_mtime = self.get_mtime(fname)
         if file_mtime is None:
@@ -180,7 +177,7 @@ class RepoMap:
         
         return tags
     
-    def get_tags_raw(self, fname: str, rel_fname: str) -> List[Tag]:
+    def get_tags_raw(self, fname: str, rel_fname: str) -> list[Tag]:
         """Parse file to extract tags using Tree-sitter."""
         try:
             from grep_ast import filename_to_lang
@@ -253,19 +250,19 @@ class RepoMap:
     
     def get_ranked_tags(
         self,
-        chat_fnames: List[str],
-        other_fnames: List[str],
-        mentioned_fnames: Optional[Set[str]] = None,
-        mentioned_idents: Optional[Set[str]] = None
-    ) -> Tuple[List[Tuple[float, Tag]], FileReport]:
+        chat_fnames: list[str],
+        other_fnames: list[str],
+        mentioned_fnames: set[str] | None = None,
+        mentioned_idents: set[str] | None = None
+    ) -> tuple[list[tuple[float, Tag]], FileReport]:
         """Get ranked tags using PageRank algorithm with file report."""
         # Return empty list and empty report if no files
         if not chat_fnames and not other_fnames:
             return [], FileReport([], {}, 0, 0, 0)
             
         # Initialize file report early
-        included: List[str] = []
-        excluded: Dict[str, str] = {}
+        included: list[str] = []
+        excluded: dict[str, str] = {}
         total_definitions = 0
         total_references = 0
         if mentioned_fnames is None:
@@ -281,9 +278,8 @@ class RepoMap:
         other_fnames = [normalize_path(f) for f in other_fnames]
         
         # Initialize file report
-        included: List[str] = []
-        excluded: Dict[str, str] = {}
-        input_files: Dict[str, Dict] = {}
+        included: list[str] = []
+        excluded: dict[str, str] = {}
         total_definitions = 0
         total_references = 0
         
@@ -340,7 +336,7 @@ class RepoMap:
                         G.add_edge(ref_fname, def_fname, name=name)
         
         if not G.nodes():
-            return [], file_report
+            return [], FileReport(excluded, 0, 0, len(all_fnames))
         
         # Run PageRank
         try:
@@ -348,7 +344,7 @@ class RepoMap:
                 ranks = nx.pagerank(G, personalization=personalization, alpha=0.85)
             else:
                 ranks = {node: 1.0 for node in G.nodes()}
-        except:
+        except Exception:
             # Fallback to uniform ranking
             ranks = {node: 1.0 for node in G.nodes()}
         
@@ -399,7 +395,7 @@ class RepoMap:
         
         return ranked_tags, file_report
     
-    def render_tree(self, abs_fname: str, rel_fname: str, lois: List[int]) -> str:
+    def render_tree(self, abs_fname: str, rel_fname: str, lois: list[int]) -> str:
         """Render a code snippet with specific lines of interest."""
         code = self.read_text_func_internal(abs_fname)
         if not code:
@@ -427,7 +423,7 @@ class RepoMap:
             
             return "\n".join(result_lines)
     
-    def to_tree(self, tags: List[Tuple[float, Tag]], chat_rel_fnames: Set[str]) -> str:
+    def to_tree(self, tags: list[tuple[float, Tag]], chat_rel_fnames: set[str]) -> str:
         """Convert ranked tags to formatted tree output."""
         if not tags:
             return ""
@@ -474,13 +470,13 @@ class RepoMap:
     
     def get_ranked_tags_map(
         self,
-        chat_fnames: List[str],
-        other_fnames: List[str],
+        chat_fnames: list[str],
+        other_fnames: list[str],
         max_map_tokens: int,
-        mentioned_fnames: Optional[Set[str]] = None,
-        mentioned_idents: Optional[Set[str]] = None,
+        mentioned_fnames: set[str] | None = None,
+        mentioned_idents: set[str] | None = None,
         force_refresh: bool = False
-    ) -> Optional[str]:
+    ) -> str | None:
         """Get the ranked tags map with caching."""
         cache_key = (
             tuple(sorted(chat_fnames)),
@@ -503,12 +499,12 @@ class RepoMap:
     
     def get_ranked_tags_map_uncached(
         self,
-        chat_fnames: List[str],
-        other_fnames: List[str],
+        chat_fnames: list[str],
+        other_fnames: list[str],
         max_map_tokens: int,
-        mentioned_fnames: Optional[Set[str]] = None,
-        mentioned_idents: Optional[Set[str]] = None
-    ) -> Tuple[Optional[str], FileReport]:
+        mentioned_fnames: set[str] | None = None,
+        mentioned_idents: set[str] | None = None
+    ) -> tuple[str | None, FileReport]:
         """Generate the ranked tags map without caching."""
         ranked_tags, file_report = self.get_ranked_tags(
             chat_fnames, other_fnames, mentioned_fnames, mentioned_idents
@@ -516,16 +512,11 @@ class RepoMap:
         
         if not ranked_tags:
             return None, file_report
-        
-        # Filter important files
-        important_files = filter_important_files(
-            [self.get_rel_fname(f) for f in other_fnames]
-        )
-        
+
         # Binary search to find the right number of tags
         chat_rel_fnames = set(self.get_rel_fname(f) for f in chat_fnames)
         
-        def try_tags(num_tags: int) -> Tuple[Optional[str], int]:
+        def try_tags(num_tags: int) -> tuple[str | None, int]:
             if num_tags <= 0:
                 return None, 0
             
@@ -556,12 +547,12 @@ class RepoMap:
     
     def get_repo_map(
         self,
-        chat_files: List[str] = None,
-        other_files: List[str] = None,
-        mentioned_fnames: Optional[Set[str]] = None,
-        mentioned_idents: Optional[Set[str]] = None,
+        chat_files: list[str] = None,
+        other_files: list[str] = None,
+        mentioned_fnames: set[str] | None = None,
+        mentioned_idents: set[str] | None = None,
         force_refresh: bool = False
-    ) -> Tuple[Optional[str], FileReport]:
+    ) -> tuple[str | None, FileReport]:
         """Generate the repository map with file report."""
         if chat_files is None:
             chat_files = []

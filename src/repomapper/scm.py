@@ -3,9 +3,9 @@ SCM file handling for RepoMap.
 """
 
 from pathlib import Path
-from typing import Optional
 
-def get_scm_fname(lang: str) -> Optional[str]:
+
+def get_scm_fname(lang: str) -> str | None:
     """Get the SCM query file for a language."""
     scm_files = {
         'arduino': 'arduino-tags.scm',

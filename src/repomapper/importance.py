@@ -3,7 +3,6 @@ Important file filtering for RepoMap.
 """
 
 import os
-from typing import List
 
 IMPORTANT_FILENAMES = {
     "README.md", "README.txt", "readme.md", "README.rst", "README",
@@ -53,6 +52,6 @@ def is_important(rel_file_path: str) -> bool:
     return False
 
 
-def filter_important_files(file_paths: List[str]) -> List[str]:
+def filter_important_files(file_paths: list[str]) -> list[str]:
     """Filter list to only include important files."""
     return [path for path in file_paths if is_important(path)]
