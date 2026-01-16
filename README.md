@@ -133,6 +133,9 @@ python repomap.py . --max-context-window 8192
 
 # Exclude files with Page Rank 0
 python repomap.py . --exclude-unranked
+
+# Only list files in directory
+python repomap.py . --overview
 ```
 
 The tool prioritizes files in the following order:
