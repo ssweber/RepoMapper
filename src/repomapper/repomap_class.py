@@ -496,7 +496,81 @@ class RepoMap:
         
         self.map_cache[cache_key] = result
         return result
-    
+
+    def generate_overview_only(self, all_files: list[str]) -> str:
+        """Generate a fast file overview without any code analysis.
+
+        This skips tree-sitter parsing, PageRank, etc. for maximum speed.
+        """
+        if not all_files:
+            return ""
+
+        overview_lines = ["=== REPOSITORY OVERVIEW ==="]
+        overview_lines.append(f"Total files: {len(all_files)}")
+        overview_lines.append("")
+
+        # Sort files for consistent output
+        sorted_files = sorted(all_files, key=lambda f: self.get_rel_fname(f))
+
+        for fname in sorted_files:
+            rel_fname = self.get_rel_fname(fname)
+            overview_lines.append(f"  {rel_fname}")
+
+        overview_lines.append("")
+
+        return "\n".join(overview_lines)
+
+    def generate_file_overview(
+        self, all_files: list[str], files_in_map: set[str], file_report: FileReport
+    ) -> str:
+        """Generate a summary of files not included in the detailed map.
+
+        Only shows excluded and cutoff files since included files are
+        already visible in the detailed code map.
+        """
+        if not all_files:
+            return ""
+
+        # Collect files that aren't in the map
+        cutoff_files = []
+        excluded_files = []
+
+        sorted_files = sorted(all_files, key=lambda f: self.get_rel_fname(f))
+
+        for fname in sorted_files:
+            if fname in files_in_map:
+                continue
+            rel_fname = self.get_rel_fname(fname)
+            if fname in file_report.excluded:
+                reason = (
+                    file_report.excluded[fname]
+                    .replace("[EXCLUDED] ", "")
+                    .replace("[NOT PROCESSED] ", "")
+                )
+                excluded_files.append((rel_fname, reason))
+            else:
+                cutoff_files.append(rel_fname)
+
+        # If everything is included, no need for an overview section
+        if not cutoff_files and not excluded_files:
+            return ""
+
+        overview_lines = []
+
+        if cutoff_files:
+            overview_lines.append(f"Files not shown (token limit): {len(cutoff_files)}")
+            for rel_fname in cutoff_files:
+                overview_lines.append(f"  [-] {rel_fname}")
+            overview_lines.append("")
+
+        if excluded_files:
+            overview_lines.append(f"Files excluded: {len(excluded_files)}")
+            for rel_fname, reason in excluded_files:
+                overview_lines.append(f"  [x] {rel_fname} ({reason})")
+            overview_lines.append("")
+
+        return "\n".join(overview_lines)
+
     def get_ranked_tags_map_uncached(
         self,
         chat_fnames: list[str],

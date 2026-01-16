@@ -191,7 +191,13 @@ Examples:
         max_context_window=args.max_context_window,
         exclude_unranked=args.exclude_unranked
     )
-    
+
+    # Handle --overview mode (fast path, no code analysis)
+    if args.overview:
+        overview = repo_map.generate_overview_only(other_files)
+        tool_output(overview)
+        return
+
     # Generate the map
     try:
         map_content, file_report = repo_map.get_repo_map(
