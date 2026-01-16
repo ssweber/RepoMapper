@@ -113,9 +113,9 @@ Examples:
     )
 
     parser.add_argument(
-        "--overview",
+        "--outline",
         action="store_true",
-        help="Output only the repository overview (file list with status)",
+        help="Output code outline (classes/functions per file, no ranking)",
     )
 
     args = parser.parse_args()
@@ -152,8 +152,6 @@ Examples:
     # other_files for RepoMap are the effective_other_files, resolved after expansion.
     other_files = [str(Path(f).resolve()) for f in effective_other_files_unresolved]
 
-    print(f"Chat files: {chat_files}")
-
     # Convert mentioned files to sets
     mentioned_fnames = set(args.mentioned_files) if args.mentioned_files else None
     mentioned_idents = set(args.mentioned_idents) if args.mentioned_idents else None
@@ -170,11 +168,15 @@ Examples:
         exclude_unranked=args.exclude_unranked,
     )
 
-    # Handle --overview mode (fast path, no code analysis)
-    if args.overview:
-        overview = repo_map.generate_overview_only(other_files)
-        tool_output(overview)
+    # Handle --outline mode (symbols only, no PageRank)
+    if args.outline:
+        # Combine chat_files and other_files for outline
+        all_files = list(set(chat_files + other_files))
+        outline = repo_map.generate_outline(all_files)
+        tool_output(outline)
         return
+
+    print(f"Chat files: {chat_files}")
 
     # Generate the map
     try:

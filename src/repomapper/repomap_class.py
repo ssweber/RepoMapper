@@ -334,10 +334,15 @@ class RepoMap:
             if personalization:
                 ranks = nx.pagerank(G, personalization=personalization, alpha=0.85)
             else:
+                ranks = nx.pagerank(G, alpha=0.85)
+        except Exception as e:
+            print(f"Error during PageRank: {e}")
+            try:
+                # If personalization caused the crash, try standard PageRank
+                ranks = nx.pagerank(G, alpha=0.85)
+            except Exception:
+                # If both fail, fallback to uniform
                 ranks = {node: 1.0 for node in G.nodes()}
-        except Exception:
-            # Fallback to uniform ranking
-            ranks = {node: 1.0 for node in G.nodes()}
 
         # Update excluded dictionary with status information
         for fname in set(chat_fnames + other_fnames):
@@ -483,28 +488,39 @@ class RepoMap:
         self.map_cache[cache_key] = result
         return result
 
-    def generate_overview_only(self, all_files: list[str]) -> str:
-        """Generate a fast file overview without any code analysis.
+    def generate_outline(self, all_files: list[str]) -> str:
+        """Generate a code outline showing all classes/functions per file.
 
-        This skips tree-sitter parsing, PageRank, etc. for maximum speed.
+        This extracts symbols via tree-sitter but skips PageRank ranking.
+        Faster than full repo map, provides structural overview.
         """
         if not all_files:
             return ""
 
-        overview_lines = ["=== REPOSITORY OVERVIEW ==="]
-        overview_lines.append(f"Total files: {len(all_files)}")
-        overview_lines.append("")
-
         # Sort files for consistent output
         sorted_files = sorted(all_files, key=lambda f: self.get_rel_fname(f))
 
+        outline_parts = []
+
         for fname in sorted_files:
             rel_fname = self.get_rel_fname(fname)
-            overview_lines.append(f"  {rel_fname}")
 
-        overview_lines.append("")
+            if not os.path.exists(fname):
+                continue
 
-        return "\n".join(overview_lines)
+            tags = self.get_tags(fname, rel_fname)
+
+            # Filter to definitions only and sort by line number
+            definitions = [(tag.name, tag.line) for tag in tags if tag.kind == "def"]
+            definitions.sort(key=lambda x: x[1])
+
+            if definitions:
+                file_lines = [rel_fname]
+                for name, line in definitions:
+                    file_lines.append(f"    {name} ({line})")
+                outline_parts.append("\n".join(file_lines))
+
+        return "\n\n".join(outline_parts)
 
     def generate_file_overview(
         self, all_files: list[str], files_in_map: set[str], file_report: FileReport
@@ -608,11 +624,13 @@ class RepoMap:
             else:
                 right = mid - 1
 
-        # Generate file overview if we have a tree
+        # Generate file overview if we have a tree (only when verbose)
         if best_tree:
-            all_files = list(set(chat_fnames + other_fnames))
-            overview = self.generate_file_overview(all_files, best_files, file_report)
-            best_tree = overview + "=== DETAILED CODE MAP ===\n\n" + best_tree
+            if self.verbose:
+                all_files = list(set(chat_fnames + other_fnames))
+                overview = self.generate_file_overview(all_files, best_files, file_report)
+                if overview:
+                    best_tree = best_tree + "\n\n" + overview
 
         return best_tree, file_report
 
