@@ -589,34 +589,45 @@ class RepoMap:
 
         # Binary search to find the right number of tags
         chat_rel_fnames = set(self.get_rel_fname(f) for f in chat_fnames)
-        
-        def try_tags(num_tags: int) -> tuple[str | None, int]:
+
+        def try_tags(num_tags: int) -> tuple[str | None, int, set[str]]:
             if num_tags <= 0:
-                return None, 0
-            
+                return None, 0, set()
+
             selected_tags = ranked_tags[:num_tags]
             tree_output = self.to_tree(selected_tags, chat_rel_fnames)
             
             if not tree_output:
-                return None, 0
-            
+                return None, 0, set()
+
+            # Extract files that are in this output
+            files_in_output = set(tag.fname for rank, tag in selected_tags)
+
             tokens = self.token_count(tree_output)
-            return tree_output, tokens
-        
+            return tree_output, tokens, files_in_output
+
         # Binary search for optimal number of tags
         left, right = 0, len(ranked_tags)
         best_tree = None
-        
+        best_files = set()
+
         while left <= right:
             mid = (left + right) // 2
-            tree_output, tokens = try_tags(mid)
-            
+            tree_output, tokens, files_in_output = try_tags(mid)
+
             if tree_output and tokens <= max_map_tokens:
                 best_tree = tree_output
+                best_files = files_in_output
                 left = mid + 1
             else:
                 right = mid - 1
-        
+
+        # Generate file overview if we have a tree
+        if best_tree:
+            all_files = list(set(chat_fnames + other_fnames))
+            overview = self.generate_file_overview(all_files, best_files, file_report)
+            best_tree = overview + "=== DETAILED CODE MAP ===\n\n" + best_tree
+
         return best_tree, file_report
     
     def get_repo_map(
