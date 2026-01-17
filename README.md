@@ -137,9 +137,6 @@ uv run repomapper . --max-context-window 8192
 
 # Exclude files with Page Rank 0
 uv run repomapper . --exclude-unranked
-
-# Output code outline (classes/functions per file)
-uv run repomapper . --outline
 ```
 
 The tool prioritizes files in the following order:

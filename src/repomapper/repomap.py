@@ -112,12 +112,6 @@ Examples:
         help="Exclude files with Page Rank 0 from the map",
     )
 
-    parser.add_argument(
-        "--outline",
-        action="store_true",
-        help="Output code outline (classes/functions per file, no ranking)",
-    )
-
     args = parser.parse_args()
 
     # Set up token counter with specified model
@@ -167,14 +161,6 @@ Examples:
         max_context_window=args.max_context_window,
         exclude_unranked=args.exclude_unranked,
     )
-
-    # Handle --outline mode (symbols only, no PageRank)
-    if args.outline:
-        # Combine chat_files and other_files for outline
-        all_files = list(set(chat_files + other_files))
-        outline = repo_map.generate_outline(all_files)
-        tool_output(outline)
-        return
 
     print(f"Chat files: {chat_files}")
 

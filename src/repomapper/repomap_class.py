@@ -488,40 +488,6 @@ class RepoMap:
         self.map_cache[cache_key] = result
         return result
 
-    def generate_outline(self, all_files: list[str]) -> str:
-        """Generate a code outline showing all classes/functions per file.
-
-        This extracts symbols via tree-sitter but skips PageRank ranking.
-        Faster than full repo map, provides structural overview.
-        """
-        if not all_files:
-            return ""
-
-        # Sort files for consistent output
-        sorted_files = sorted(all_files, key=lambda f: self.get_rel_fname(f))
-
-        outline_parts = []
-
-        for fname in sorted_files:
-            rel_fname = self.get_rel_fname(fname)
-
-            if not os.path.exists(fname):
-                continue
-
-            tags = self.get_tags(fname, rel_fname)
-
-            # Filter to definitions only and sort by line number
-            definitions = [(tag.name, tag.line) for tag in tags if tag.kind == "def"]
-            definitions.sort(key=lambda x: x[1])
-
-            if definitions:
-                file_lines = [rel_fname]
-                for name, line in definitions:
-                    file_lines.append(f"    {name} ({line})")
-                outline_parts.append("\n".join(file_lines))
-
-        return "\n\n".join(outline_parts)
-
     def generate_file_overview(
         self, all_files: list[str], files_in_map: set[str], file_report: FileReport
     ) -> str:
